@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F2A900">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Bus Mileage">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<title>Bus Mileage Log</title>
+<style>
+:root{
+  --bus:#F2A900; --letter:#000; --bg:#F3F4F6; --surface:#FFFFFF; --ink:#23262B; --muted:#5E6570;
+  --line:#D5D8DC; --go:#1F7A3A; --go-soft:#E3F2E7; --stop:#C62828; --stop-soft:#FBE6E6; --field:#FFFFFF;
+  color-scheme: light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  font-family: system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#15171A; --surface:#1F2226; --ink:#ECEEF0; --muted:#A3AAB3; --line:#363B42;
+    --go:#5BC27A; --go-soft:#1C3324; --stop:#FF6B6B; --stop-soft:#3A1F1F; --field:#272B30; color-scheme: dark;
+  }
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-size:17px;line-height:1.45;-webkit-text-size-adjust:100%}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bus)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:3px solid #1565C0;outline-offset:2px}
+
+/* The bus-side band: the one loud element */
+.band{background:var(--bus);color:var(--letter);padding:14px 18px 0;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.band-row{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;max-width:820px;margin:0 auto}
+.lettering{font-weight:900;font-stretch:condensed;letter-spacing:.02em;font-size:clamp(22px,5.5vw,30px);line-height:1;margin:0}
+.lettering small{display:block;font-weight:600;font-size:14px;letter-spacing:0;margin-top:4px;font-stretch:normal}
+.busno{background:none;border:0;padding:0;cursor:pointer;text-align:right;color:var(--letter)}
+.busno span{display:block;font-size:12px;font-weight:700}
+.busno b{display:block;font-size:clamp(34px,9vw,46px);font-weight:900;line-height:.95;font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:4px;max-width:820px;margin:12px auto 0}
+.tab{flex:1;border:0;background:transparent;padding:11px 8px;font-weight:700;border-radius:10px 10px 0 0;color:var(--letter);cursor:pointer}
+.tab[aria-selected="true"]{background:var(--bg);color:var(--ink)}
+.status{max-width:820px;margin:0 auto;padding:8px 18px 0;font-size:14px;color:var(--muted);display:flex;align-items:center;gap:8px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.dot.on{background:var(--go)}
+
+main{max-width:820px;margin:0 auto;padding:12px 16px 40px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:14px}
+h2{font-size:20px;margin:0 0 4px}
+.hint{color:var(--muted);font-size:15px;margin:0 0 14px}
+label.f{display:block;font-weight:650;font-size:15px;margin:14px 0 6px}
+input[type=text],input[type=date],input[type=number],input[type=search],select{
+  width:100%;min-height:50px;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:var(--field);font-size:18px}
+input:focus{border-color:var(--ink)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:460px){.row2{grid-template-columns:1fr}}
+
+.seg{display:grid;grid-template-columns:1fr 1fr;border:2px solid var(--ink);border-radius:12px;overflow:hidden;margin-top:14px}
+.seg button{border:0;background:transparent;padding:14px 8px;font-weight:800;font-size:17px;cursor:pointer}
+.seg button+button{border-left:2px solid var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}
+.chip{border:1.5px solid var(--line);background:var(--field);border-radius:999px;padding:9px 14px;font-weight:600;cursor:pointer;font-size:15px}
+.chip[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:var(--surface)}
+.linkbtn{background:none;border:0;padding:6px 0;color:#1565C0;font-weight:600;cursor:pointer;font-size:15px;text-decoration:underline}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .linkbtn{color:#8AB4F8}}
+
+.check{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-top:1px solid var(--line)}
+.check:first-of-type{border-top:0}
+.check .name{font-weight:650}
+.pf{display:flex;gap:6px}
+.pf button{min-width:76px;min-height:46px;border-radius:10px;border:1.5px solid var(--line);background:var(--field);font-weight:800;cursor:pointer}
+.pf button[data-v="pass"][aria-pressed="true"]{background:var(--go);border-color:var(--go);color:#fff}
+.pf button[data-v="fail"][aria-pressed="true"]{background:var(--stop);border-color:var(--stop);color:#fff}
+.switch{position:relative;width:62px;height:36px;flex:none}
+.switch input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:1}
+.switch i{position:absolute;inset:0;border-radius:999px;background:var(--line);transition:background .15s}
+.switch i::after{content:"";position:absolute;top:4px;left:4px;width:28px;height:28px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 2px rgba(0,0,0,.3)}
+.switch input:checked+i{background:var(--go)}
+.switch input:checked+i::after{transform:translateX(26px)}
+.switch input:focus-visible+i{outline:3px solid #1565C0;outline-offset:2px}
+
+.trip{display:flex;gap:12px;align-items:flex-start;border:1.5px solid var(--line);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer}
+.trip:has(input:checked){border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.trip input{width:22px;height:22px;margin-top:2px;accent-color:var(--ink)}
+.trip b{display:block}
+.trip span{color:var(--muted);font-size:15px}
+.empty{border:1.5px dashed var(--line);border-radius:12px;padding:16px;color:var(--muted)}
+
+.primary{width:100%;min-height:56px;margin-top:18px;border:0;border-radius:12px;background:var(--bus);color:#000;font-weight:900;font-size:18px;cursor:pointer}
+.primary:disabled{opacity:.45;cursor:not-allowed}
+.btn{min-height:46px;padding:10px 16px;border:1.5px solid var(--line);border-radius:10px;background:var(--surface);font-weight:700;cursor:pointer}
+.btn.danger{color:var(--stop);border-color:var(--stop)}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+
+.sheethead{display:flex;flex-wrap:wrap;gap:12px;align-items:end;justify-content:space-between;margin-bottom:12px}
+.sheethead select{width:auto;min-width:200px}
+.totals{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--muted);font-size:15px;margin:10px 0 0}
+.totals b{color:var(--ink)}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:10px}
+table.sheet{border-collapse:collapse;width:100%;min-width:860px;font-size:15px;font-variant-numeric:tabular-nums}
+.sheet th{background:var(--bg);font-size:13px;font-weight:700;text-align:left;padding:8px;border-bottom:1.5px solid var(--line);vertical-align:bottom;line-height:1.2}
+.sheet td{padding:10px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+.sheet tbody tr{cursor:pointer}
+.sheet tbody tr:hover{background:var(--bg)}
+.sheet .c{text-align:center}
+.ok{color:var(--go);font-weight:900}
+.no{color:var(--stop);font-weight:900}
+.open{display:inline-block;font-size:12px;font-weight:800;background:var(--stop-soft);color:var(--stop);border-radius:6px;padding:2px 6px}
+
+dialog{border:0;border-radius:16px;padding:0;width:min(560px,94vw);background:var(--surface);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dlg{padding:20px;max-height:85vh;overflow:auto}
+.dlg-foot{display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;margin-top:18px}
+
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--surface);padding:12px 18px;border-radius:12px;font-weight:700;opacity:0;pointer-events:none;transition:.2s;z-index:50;max-width:90vw}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.msg{margin-top:14px;border-radius:10px;padding:12px 14px;font-weight:650;background:var(--stop-soft);color:var(--stop)}
+.msg.good{background:var(--go-soft);color:var(--go)}
+.req::after{content:" *";color:var(--stop);font-weight:800}
+input.missing{border-color:var(--stop)!important;border-width:2px;background:var(--stop-soft)!important;box-shadow:0 0 0 3px var(--stop-soft)}
+.check.missing{background:var(--stop-soft);border-radius:10px;padding-left:10px;padding-right:10px;box-shadow:inset 3px 0 0 var(--stop)}
+.missing-label{color:var(--stop)}
+.check .name.req{white-space:nowrap}
+.err{margin:6px 0 0;color:var(--stop);font-size:14px;font-weight:700;display:flex;gap:6px;align-items:flex-start}
+.err::before{content:"!";flex:none;display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--stop);color:#fff;font-size:12px;font-weight:900;margin-top:1px}
+.check + .err{margin:0 0 8px}
+.reqnote{font-size:14px;color:var(--muted);margin:-8px 0 4px}
+.reqnote span{color:var(--stop);font-weight:800}
+.banner{background:var(--stop-soft);color:var(--stop);border-radius:10px;padding:10px 14px;font-weight:650;margin-bottom:12px}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* Print = PDF export */
+#printArea{display:none}
+@media print{
+  @page{size:letter landscape;margin:.4in}
+  body::before,.band,.status,main,dialog,.toast{display:none!important}
+  body{background:#fff;color:#000}
+  #printArea{display:block}
+  .psheet{page-break-after:always;font-family:Calibri,Arial,sans-serif;color:#000}
+  .psheet:last-child{page-break-after:auto}
+  .ptitle{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid #000;padding-bottom:4px;margin-bottom:6px}
+  .ptitle h1{font-size:16pt;margin:0;text-align:center;flex:1}
+  .ptitle div{font-size:12pt;font-weight:700;min-width:1.6in}
+  .ptable{width:100%;border-collapse:collapse;font-size:9.5pt}
+  .ptable th,.ptable td{border:1px solid #000;padding:3px 5px}
+  .ptable th{font-size:8.5pt;background:#eee;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .ptable td.c{text-align:center}
+  .pfoot{margin-top:6px;font-size:9.5pt}
+}
+</style>
+</head>
+<body>
+
+<header class="band">
+  <div class="band-row">
+    <h1 class="lettering">Monthly Mileage<small id="monthLabel">Sheet</small></h1>
+    <button class="busno" id="busBtn" aria-label="Change bus number"><span>Bus #</span><b id="busNo">—</b></button>
+  </div>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="tabLog" aria-selected="true">Log a trip</button>
+    <button class="tab" role="tab" id="tabSheets" aria-selected="false">Monthly sheets</button>
+  </div>
+</header>
+<div class="status"><span class="dot" id="netDot"></span><span id="netText">Checking connection…</span></div>
+
+<main>
+  <div class="banner" id="storageBanner" hidden>This browser isn’t allowing saved data, so entries will be lost when the page closes. Open the app from its home-screen icon or a normal browser window.</div>
+
+  <!-- LOG -->
+  <section id="viewLog">
+    <div class="panel" id="emptyBanner" hidden style="border-color:var(--bus);box-shadow:inset 4px 0 0 var(--bus)">
+      <h2>No trips on this device yet</h2>
+      <p class="hint">If this tablet’s data was cleared, restore your latest backup file to bring every month back. Otherwise, start with a pre-trip below.</p>
+      <button class="btn" id="emptyRestore">Restore from backup</button>
+    </div>
+    <div class="panel">
+      <label class="f req" for="date" style="margin-top:0">Date</label>
+      <input type="date" id="date">
+      <div class="seg" role="group" aria-label="Trip check type">
+        <button id="modePre" aria-pressed="true">Pre-trip</button>
+        <button id="modePost" aria-pressed="false">Post-trip</button>
+      </div>
+    </div>
+
+    <!-- PRE -->
+    <form class="panel" id="preForm" autocomplete="off" novalidate>
+      <h2>Pre-trip</h2>
+      <p class="hint">Fill this out before the route. You’ll finish the same record after the route with Post-trip.</p>
+      <p class="reqnote"><span>*</span> Required</p>
+
+      <div class="row2">
+        <div>
+          <label class="f req" for="bus">Bus #</label>
+          <input type="text" id="bus" inputmode="numeric" autocomplete="off" placeholder="Bus number">
+        </div>
+        <div>
+          <label class="f req" for="begin">Beginning mileage</label>
+          <input type="number" id="begin" inputmode="numeric" min="0" step="1" placeholder="Odometer reading">
+        </div>
+      </div>
+      <button type="button" class="linkbtn" id="useLast" hidden></button>
+
+      <label class="f req" for="route">Type of route</label>
+      <div class="chips" id="routeChips">
+        <button type="button" class="chip" aria-pressed="false">AM Route</button>
+        <button type="button" class="chip" aria-pressed="false">PM Route</button>
+        <button type="button" class="chip" aria-pressed="false">Activity</button>
+        <button type="button" class="chip" aria-pressed="false">Field Trip</button>
+      </div>
+      <input type="text" id="route" placeholder="Or type a route" list="routeList">
+      <datalist id="routeList"></datalist>
+
+      <div class="row2">
+        <div>
+          <label class="f req" for="driver">Name of driver</label>
+          <input type="text" id="driver" list="driverList" autocapitalize="words" placeholder="First and last name">
+          <datalist id="driverList"></datalist>
+        </div>
+        <div>
+          <label class="f" for="fuel">Fuel</label>
+          <input type="text" id="fuel" list="fuelList" autocapitalize="sentences" placeholder="Leave blank if none">
+          <div class="chips" style="margin:8px 0 0"><button type="button" class="chip" id="fuelFilled" aria-pressed="false">Filled</button></div>
+          <datalist id="fuelList"><option value="Filled"></datalist>
+        </div>
+      </div>
+
+      <label class="f">Checks</label>
+      <div class="check"><span class="name req">Pre-trip check</span>
+        <div class="pf" data-name="preCheck"><button type="button" data-v="pass" aria-pressed="false">✓ Pass</button><button type="button" data-v="fail" aria-pressed="false">✗ Fail</button></div>
+      </div>
+      <div class="check"><label class="name" for="preIn">Cleaned inside of bus</label>
+        <span class="switch"><input type="checkbox" id="preIn"><i></i></span></div>
+      <div class="check"><label class="name" for="preOut">Cleaned outside of bus</label>
+        <span class="switch"><input type="checkbox" id="preOut"><i></i></span></div>
+
+      <div class="msg" id="preMsg" role="alert" hidden></div>
+      <button class="primary" type="submit">Save pre-trip</button>
+    </form>
+
+    <!-- POST -->
+    <form class="panel" id="postForm" autocomplete="off" novalidate hidden>
+      <h2>Post-trip</h2>
+      <p class="hint">Pick the pre-trip from this date to finish it.</p>
+      <p class="reqnote"><span>*</span> Required</p>
+      <div class="msg" id="retryBox" role="alert" hidden style="margin:0 0 14px"><span id="retryText"></span><div style="margin-top:10px"><button type="button" class="btn" id="retryBackup">Save backup file</button></div></div>
+      <div id="openTrips"></div>
+
+      <div id="postFields">
+        <label class="f req" for="end">Ending mileage</label>
+        <input type="number" id="end" inputmode="numeric" min="0" step="1" placeholder="Odometer reading">
+
+        <label class="f" for="postFuel">Fuel</label>
+        <input type="text" id="postFuel" list="fuelList" autocapitalize="sentences" placeholder="Leave blank if none">
+        <div class="chips" style="margin:8px 0 0"><button type="button" class="chip" id="postFuelFilled" aria-pressed="false">Filled</button></div>
+        <p class="hint" id="postFuelHint" style="margin:6px 0 0" hidden>Filled in from the pre-trip. Change it if fuel was added after the route.</p>
+
+        <label class="f">Checks</label>
+        <div class="check"><span class="name req">Post-trip check</span>
+          <div class="pf" data-name="postCheck"><button type="button" data-v="pass" aria-pressed="false">✓ Pass</button><button type="button" data-v="fail" aria-pressed="false">✗ Fail</button></div>
+        </div>
+        <div class="check"><label class="name" for="postIn">Cleaned inside of bus</label>
+          <span class="switch"><input type="checkbox" id="postIn"><i></i></span></div>
+        <div class="check"><label class="name" for="postOut">Cleaned outside of bus</label>
+          <span class="switch"><input type="checkbox" id="postOut"><i></i></span></div>
+
+        <p class="hint" id="ipadTip" hidden style="margin:16px 0 0;padding:10px 12px;border:1.5px dashed var(--line);border-radius:10px">After you save, a window opens for the backup file. Tap <b>Save to Files</b>, then <b>Save</b>. Don’t close it with the X.</p>
+        <div class="msg" id="postMsg" role="alert" hidden></div>
+        <button class="primary" type="submit" id="postSave">Save post-trip</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- SHEETS -->
+  <section id="viewSheets" hidden>
+    <div class="panel">
+      <div class="sheethead">
+        <div>
+          <label class="f" for="monthSel" style="margin-top:0">Month</label>
+          <select id="monthSel"></select>
+        </div>
+        <div class="btns">
+          <button class="btn" id="csvMonth">Export CSV</button>
+          <button class="btn" id="pdfMonth">Export PDF</button>
+        </div>
+      </div>
+      <div class="scroll"><table class="sheet" id="sheetTable"></table></div>
+      <div class="totals" id="totals"></div>
+      <p class="hint" style="margin:10px 0 0">Tap a row to correct or delete it.</p>
+    </div>
+
+    <div class="panel">
+      <h2>All months</h2>
+      <p class="hint">Every month is kept on this device until you delete it. Export everything at once when you’re back online.</p>
+      <div class="btns">
+        <button class="btn" id="csvAll">Export all as CSV</button>
+        <button class="btn" id="pdfAll">Export all as PDF</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Backup file</h2>
+      <p class="hint">A file saved outside the app survives if someone clears the browser’s data. On iPad, each save asks where to put the file. Choose <b>Save to Files</b>. To get trips back after data is cleared, tap Restore from backup and pick the newest file. Restoring adds to what’s already here.</p>
+      <div class="check" style="border-top:0;padding-top:0"><label class="name" for="autoBackup">Also save a backup file after every post-trip</label>
+        <span class="switch"><input type="checkbox" id="autoBackup"><i></i></span></div>
+      <div id="pickWrap" hidden style="margin-bottom:12px">
+        <p class="hint" style="margin:0 0 8px">On this device, backups can update one file silently instead of downloading a new file each time.</p>
+        <button class="btn" id="pickBackup">Choose backup file location</button>
+      </div>
+      <p class="hint" id="backupStatus" style="margin:0 0 12px"></p>
+      <div class="btns">
+        <button class="btn" id="backupBtn">Save backup file</button>
+        <button class="btn" id="restoreBtn">Restore from backup</button>
+        <input type="file" id="restoreFile" accept=".json,application/json" hidden>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Edit record -->
+<dialog id="editDlg">
+  <form class="dlg" id="editForm" method="dialog" novalidate>
+    <h2>Edit trip</h2>
+    <p class="reqnote" style="margin:4px 0 0"><span>*</span> Required. Post-trip check is required once there’s an ending mileage.</p>
+    <div class="row2">
+      <div><label class="f req" for="eDate">Date</label><input type="date" id="eDate"></div>
+      <div><label class="f req" for="eBus">Bus #</label><input type="text" id="eBus"></div>
+      <div><label class="f req" for="eBegin">Beginning mileage</label><input type="number" id="eBegin" inputmode="numeric"></div>
+      <div><label class="f" for="eEnd">Ending mileage</label><input type="number" id="eEnd" inputmode="numeric"></div>
+      <div><label class="f req" for="eRoute">Type of route</label><input type="text" id="eRoute" list="routeList"></div>
+      <div><label class="f" for="eFuel">Fuel</label><input type="text" id="eFuel" list="fuelList"></div>
+    </div>
+    <label class="f req" for="eDriver">Name of driver</label><input type="text" id="eDriver" list="driverList">
+    <label class="f">Checks</label>
+    <div class="check"><span class="name req">Pre-trip check</span>
+      <div class="pf" data-name="ePre"><button type="button" data-v="pass" aria-pressed="false">✓ Pass</button><button type="button" data-v="fail" aria-pressed="false">✗ Fail</button></div></div>
+    <div class="check"><span class="name">Post-trip check</span>
+      <div class="pf" data-name="ePost"><button type="button" data-v="pass" aria-pressed="false">✓ Pass</button><button type="button" data-v="fail" aria-pressed="false">✗ Fail</button></div></div>
+    <div class="check"><label class="name" for="eIn">Cleaned inside of bus</label><span class="switch"><input type="checkbox" id="eIn"><i></i></span></div>
+    <div class="check"><label class="name" for="eOut">Cleaned outside of bus</label><span class="switch"><input type="checkbox" id="eOut"><i></i></span></div>
+    <div class="dlg-foot">
+      <button type="button" class="btn danger" id="eDelete">Delete trip</button>
+      <span class="btns"><span class="msg" id="editMsg" role="alert" hidden style="margin:0 0 8px;width:100%"></span><button type="button" class="btn" id="eCancel">Cancel</button><button type="button" class="btn" id="eSave" style="background:var(--bus);color:#000;border-color:var(--bus)">Save changes</button></span>
+    </div>
+  </form>
+</dialog>
+
+<!-- Bus number -->
+<dialog id="busDlg">
+  <form class="dlg" novalidate onsubmit="return false">
+    <h2>Bus number</h2>
+    <p class="hint">Saved on this device and filled in on every new pre-trip. You can still change it on the form.</p>
+    <label class="f req" for="busInput" style="margin-top:0">Bus #</label>
+    <input type="text" id="busInput" inputmode="numeric" placeholder="Bus number">
+    <div class="dlg-foot"><span></span><span class="btns"><button type="button" class="btn" id="busCancel">Cancel</button><button type="button" class="btn" id="busSave" style="background:var(--bus);color:#000;border-color:var(--bus)">Save bus number</button></span></div>
+  </form>
+</dialog>
+
+<dialog id="askDlg"><div class="dlg"><h2 id="askTitle">Are you sure?</h2><p class="hint" id="askText" style="margin-bottom:0"></p><div class="dlg-foot"><span></span><span class="btns"><button type="button" class="btn" id="askNo">Go back</button><button type="button" class="btn" id="askYes" style="background:var(--bus);color:#000;border-color:var(--bus)">Save anyway</button></span></div></div></dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="printArea"></div>
+
+<script>
+(function(){
+'use strict';
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const PREFIX = 'bml:sheet:';
+const SETTINGS = 'bml:settings';
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+/* ---------- storage (falls back to memory if the browser blocks it) ---------- */
+let mem = null;
+try { const t='bml:test'; localStorage.setItem(t,'1'); localStorage.removeItem(t); }
+catch(e){ mem = {}; $('#storageBanner').hidden = false; }
+const store = {
+  get(k){ try{ return mem ? (k in mem ? mem[k] : null) : localStorage.getItem(k); }catch(e){ return null; } },
+  set(k,v){ try{ mem ? (mem[k]=v) : localStorage.setItem(k,v); return true; }catch(e){ toast('This device is out of space. Export and delete old months, then try again.'); return false; } },
+  del(k){ try{ mem ? delete mem[k] : localStorage.removeItem(k); }catch(e){} },
+  keys(){ try{ return mem ? Object.keys(mem) : Object.keys(localStorage); }catch(e){ return []; } }
+};
+const readJSON = (k,d) => { const v = store.get(k); if(!v) return d; try{ return JSON.parse(v); }catch(e){ return d; } };
+const writeJSON = (k,v) => store.set(k, JSON.stringify(v));
+try{ if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{}); }catch(e){}
+
+let settings = Object.assign({bus:'', driver:'', fileBackup:true, lastBackup:null, lastBackupHow:''}, readJSON(SETTINGS, {}));
+['autoBackup','cloudUrl','cloudKey','cloudRev','cloudSaved','lastCloud','cloudError','deleted'].forEach(k => delete settings[k]);
+const saveSettings = () => writeJSON(SETTINGS, settings);
+
+/* ---------- dates & sheets ---------- */
+const todayISO = () => { const d=new Date(); return new Date(d - d.getTimezoneOffset()*60000).toISOString().slice(0,10); };
+const monthOf = iso => iso.slice(0,7);
+const monthName = m => MONTHS[+m.slice(5,7)-1] + ' ' + m.slice(0,4);
+const shortDate = iso => (+iso.slice(5,7)) + '-' + (+iso.slice(8,10));
+const usDate = iso => iso.slice(5,7) + '/' + iso.slice(8,10) + '/' + iso.slice(0,4);
+const getSheet = m => readJSON(PREFIX + m, []);
+const sortTrips = a => a.sort((x,y) => x.date.localeCompare(y.date) || (x.preAt||'').localeCompare(y.preAt||''));
+const putSheet = (m, a) => writeJSON(PREFIX + m, sortTrips(a));
+const allMonths = () => store.keys().filter(k => k.startsWith(PREFIX)).map(k => k.slice(PREFIX.length)).sort().reverse();
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+
+function ensureCurrentMonth(){
+  const m = monthOf(todayISO());
+  if (store.get(PREFIX + m) === null) writeJSON(PREFIX + m, []);
+  $('#monthLabel').textContent = monthName(m);
+}
+
+function allTrips(){ return allMonths().flatMap(m => getSheet(m)); }
+
+/* ---------- UI helpers ---------- */
+let toastT;
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),2600); }
+function say(id, text, good){ const el=$('#'+id); if(!text){ el.hidden=true; return; } el.textContent=text; el.classList.toggle('good',!!good); el.hidden=false; }
+function hostOf(el){ return el.classList.contains('pf') ? el.closest('.check') : el; }
+function labelOf(el){ return el.classList.contains('pf') ? el.closest('.check').querySelector('.name') : (el.id ? document.querySelector('label[for="'+el.id+'"]') : null); }
+function clearErr(el){
+  if (!el) return; const host = hostOf(el);
+  host.classList.remove('missing'); el.classList.remove('missing');
+  const lab = labelOf(el); if (lab) lab.classList.remove('missing-label');
+  const n = host.nextElementSibling; if (n && n.classList.contains('err')) n.remove();
+}
+function clearErrs(){ $$('.err').forEach(e => e.remove()); $$('.missing').forEach(e => e.classList.remove('missing')); $$('.missing-label').forEach(e => e.classList.remove('missing-label')); }
+// list: [[selector, message], ...]
+function flag(list){
+  clearErrs(); let first = null;
+  list.forEach(([sel, msg]) => {
+    const el = document.querySelector(sel); if (!el) return;
+    const host = hostOf(el); host.classList.add('missing'); el.classList.add('missing');
+    const lab = labelOf(el); if (lab) lab.classList.add('missing-label');
+    const p = document.createElement('p'); p.className = 'err'; p.textContent = msg; host.insertAdjacentElement('afterend', p);
+    if (!first) first = el;
+  });
+  if (first){
+    const target = first.classList.contains('pf') ? first.closest('.check') : first;
+    target.scrollIntoView({block:'center', behavior:'smooth'});
+    if (first.tagName === 'INPUT') setTimeout(() => { try{ first.focus({preventScroll:true}); }catch(e){} }, 350);
+  }
+  return list.length;
+}
+function wholeMiles(v){ return v !== null && Number.isFinite(v) && v >= 0 && Math.floor(v) === v; }
+function ask(text, yesLabel, title){
+  return new Promise(res => {
+    const d=$('#askDlg'); $('#askText').textContent=text; $('#askYes').textContent=yesLabel||'Save anyway'; $('#askTitle').textContent=title||'Check this first';
+    const done=v=>{ $('#askYes').onclick=$('#askNo').onclick=null; d.onclose=null; if(d.open) d.close(); res(v); };
+    $('#askYes').onclick=()=>done(true); $('#askNo').onclick=()=>done(false); d.onclose=()=>done(false);
+    try{ d.showModal(); }catch(e){ res(true); }
+  });
+}
+document.addEventListener('input', e => { if (e.target.classList && e.target.classList.contains('missing')) clearErr(e.target); });
+document.addEventListener('click', e => { const g = e.target.closest && e.target.closest('.pf'); if (g && g.classList.contains('missing')) clearErr(g); });
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function pfGet(name){ const b = document.querySelector('.pf[data-name="'+name+'"] button[aria-pressed="true"]'); return b ? b.dataset.v : ''; }
+function pfSet(name, v){ $$('.pf[data-name="'+name+'"] button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.v === v))); }
+$$('.pf').forEach(g => g.addEventListener('click', e => {
+  const b = e.target.closest('button'); if(!b) return;
+  const on = b.getAttribute('aria-pressed') === 'true';
+  pfSet(g.dataset.name, on ? '' : b.dataset.v);
+}));
+const num = v => v === '' || v == null ? null : Number(v);
+
+function renderBus(){ $('#busNo').textContent = settings.bus || '—'; }
+
+function refreshLists(){
+  const trips = allTrips();
+  const drivers = [...new Set(trips.map(t => t.driver).filter(Boolean))];
+  const routes = [...new Set(['AM Route','PM Route','Activity','Field Trip', ...trips.map(t => t.route).filter(Boolean)])];
+  $('#driverList').innerHTML = drivers.map(d => '<option value="'+esc(d)+'">').join('');
+  $('#routeList').innerHTML = routes.map(r => '<option value="'+esc(r)+'">').join('');
+}
+
+function lastEnding(){
+  const bus = ($('#bus').value || settings.bus || '').trim();
+  const done = allTrips().filter(t => t.end != null && (!bus || !t.bus || t.bus === bus));
+  if (!done.length) return null;
+  sortTrips(done);
+  return done[done.length-1].end;
+}
+
+/* ---------- tabs & mode ---------- */
+function showTab(which){
+  $('#tabLog').setAttribute('aria-selected', String(which==='log'));
+  $('#tabSheets').setAttribute('aria-selected', String(which==='sheets'));
+  $('#viewLog').hidden = which !== 'log';
+  $('#viewSheets').hidden = which !== 'sheets';
+  if (which === 'sheets') renderSheets();
+}
+$('#tabLog').onclick = () => showTab('log');
+$('#tabSheets').onclick = () => showTab('sheets');
+
+let mode = 'pre';
+function setMode(m){
+  mode = m; say('preMsg',''); say('postMsg',''); clearErrs(); if (m === 'pre') $('#retryBox').hidden = true;
+  $('#modePre').setAttribute('aria-pressed', String(m==='pre'));
+  $('#modePost').setAttribute('aria-pressed', String(m==='post'));
+  $('#preForm').hidden = m !== 'pre';
+  $('#postForm').hidden = m !== 'post';
+  if (m === 'post') renderOpenTrips(); else prepPre();
+}
+$('#modePre').onclick = () => setMode('pre');
+$('#modePost').onclick = () => setMode('post');
+$('#date').addEventListener('change', () => { if (mode==='post') renderOpenTrips(); });
+
+/* ---------- pre-trip ---------- */
+function prepPre(){
+  const le = lastEnding();
+  const b = $('#useLast');
+  if (le != null && !$('#begin').value){ b.hidden=false; b.textContent = 'Use last ending mileage (' + le + ')'; b.onclick = () => { $('#begin').value = le; b.hidden = true; }; }
+  else b.hidden = true;
+  if (!$('#driver').value) $('#driver').value = settings.driver || '';
+  if (!$('#bus').value) $('#bus').value = settings.bus || '';
+}
+$('#bus').addEventListener('change', () => { $('#useLast').hidden = true; prepPre(); });
+$('#routeChips').addEventListener('click', e => {
+  const c = e.target.closest('.chip'); if(!c) return;
+  $('#route').value = c.textContent; syncChips(); clearErr($('#route'));
+});
+$('#route').addEventListener('input', syncChips);
+function fuelChip(inputSel, chipSel){
+  const sync = () => $(chipSel).setAttribute('aria-pressed', String($(inputSel).value.trim().toLowerCase() === 'filled'));
+  $(chipSel).onclick = () => { $(inputSel).value = $(inputSel).value.trim().toLowerCase() === 'filled' ? '' : 'Filled'; sync(); };
+  $(inputSel).addEventListener('input', sync);
+  return sync;
+}
+const syncFuel = fuelChip('#fuel', '#fuelFilled');
+const syncPostFuel = fuelChip('#postFuel', '#postFuelFilled');
+function syncChips(){ $$('#routeChips .chip').forEach(c => c.setAttribute('aria-pressed', String(c.textContent === $('#route').value))); }
+
+$('#preForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const date = $('#date').value;
+  const begin = num($('#begin').value);
+  const route = $('#route').value.trim();
+  const driver = $('#driver').value.trim();
+  const preCheck = pfGet('preCheck');
+  const bus = $('#bus').value.trim();
+  const errs = [];
+  if (!date) errs.push(['#date', 'Pick the date.']);
+  if (!bus) errs.push(['#bus', 'Enter the bus number.']);
+  if (begin == null) errs.push(['#begin', 'Enter the beginning mileage.']);
+  else if (!wholeMiles(begin)) errs.push(['#begin', 'Use a whole number with no decimals.']);
+  if (!route) errs.push(['#route', 'Pick or type the type of route.']);
+  if (!driver) errs.push(['#driver', 'Enter the driver’s name.']);
+  if (!preCheck) errs.push(['.pf[data-name="preCheck"]', 'Choose Pass or Fail.']);
+  if (flag(errs)){ say('preMsg', errs.length === 1 ? '1 field needs attention before saving.' : errs.length + ' fields need attention before saving.'); return; }
+  say('preMsg', '');
+
+  const m = monthOf(date);
+  const sheet = getSheet(m);
+  sheet.push({
+    id: uid(), date, bus, begin, route, driver,
+    fuel: $('#fuel').value.trim(), preCheck,
+    preIn: $('#preIn').checked, preOut: $('#preOut').checked,
+    end: null, postCheck: '', postIn: false, postOut: false,
+    preAt: new Date().toISOString(), postAt: null
+  });
+  if (!putSheet(m, sheet)) return;
+  settings.driver = driver; settings.bus = bus; saveSettings(); renderBus();
+  ['#begin','#route','#fuel'].forEach(s => $(s).value = ''); syncFuel();
+  $('#preIn').checked = $('#preOut').checked = false; pfSet('preCheck',''); syncChips();
+  refreshLists(); prepPre(); renderEmptyBanner();
+  toast('Pre-trip saved for ' + shortDate(date));
+  window.scrollTo({top:0, behavior:'smooth'});
+});
+
+/* ---------- post-trip ---------- */
+function renderOpenTrips(){
+  const date = $('#date').value;
+  const box = $('#openTrips');
+  const open = date ? getSheet(monthOf(date)).filter(t => t.date === date && t.end == null) : [];
+  $('#postFields').hidden = !open.length;
+  if (!open.length){
+    box.innerHTML = '<div class="empty">No open pre-trip for ' + (date ? esc(usDate(date)) : 'this date') + '. Switch to Pre-trip to start one, or check the date.</div>';
+    return;
+  }
+  box.innerHTML = open.map((t,i) =>
+    '<label class="trip"><input type="radio" name="openTrip" value="'+t.id+'"'+(i===0?' checked':'')+'>' +
+    '<div><b>'+esc(t.route)+'</b><span>'+esc(t.driver)+', began at '+t.begin+(t.bus?', bus '+esc(t.bus):'')+'</span></div></label>'
+  ).join('');
+  fillPostFuel();
+}
+function fillPostFuel(){
+  const sel = document.querySelector('input[name="openTrip"]:checked'), date = $('#date').value;
+  const t = sel && date ? getSheet(monthOf(date)).find(x => x.id === sel.value) : null;
+  const v = t && t.fuel != null ? String(t.fuel) : '';
+  $('#postFuel').value = v; $('#postFuelHint').hidden = !v; syncPostFuel();
+}
+$('#openTrips').addEventListener('change', e => { if (e.target.name === 'openTrip') fillPostFuel(); });
+
+$('#postForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  const date = $('#date').value;
+  const sel = document.querySelector('input[name="openTrip"]:checked');
+  if (!sel){ say('postMsg', 'Pick the pre-trip to finish.'); return; }
+  const end = num($('#end').value);
+  const postCheck = pfGet('postCheck');
+  const errs = [];
+  if (end == null) errs.push(['#end', 'Enter the ending mileage.']);
+  else if (!wholeMiles(end)) errs.push(['#end', 'Use a whole number with no decimals.']);
+  if (!postCheck) errs.push(['.pf[data-name="postCheck"]', 'Choose Pass or Fail.']);
+  if (flag(errs)){ say('postMsg', errs.length === 1 ? '1 field needs attention before saving.' : errs.length + ' fields need attention before saving.'); return; }
+  say('postMsg', '');
+  const m = monthOf(date);
+  const sheet = getSheet(m);
+  const t = sheet.find(x => x.id === sel.value);
+  if (!t){ say('postMsg', 'That pre-trip could not be found. Reopen the app and try again.'); return; }
+  if (end < t.begin && !(await ask('Ending mileage (' + end + ') is less than beginning mileage (' + t.begin + ').'))) return;
+  if (end - t.begin > 500 && !(await ask('That’s ' + (end - t.begin) + ' miles for one trip.'))) return;
+  Object.assign(t, { end, fuel: $('#postFuel').value.trim(), postCheck, postIn: $('#postIn').checked, postOut: $('#postOut').checked, postAt: new Date().toISOString() });
+  if (!putSheet(m, sheet)) return;
+  $('#end').value = ''; $('#postIn').checked = $('#postOut').checked = false; pfSet('postCheck','');
+  renderOpenTrips();
+  toast('Post-trip saved for ' + shortDate(date));
+  if (fileBackupOn()) autoBackup();
+});
+
+/* ---------- sheets view ---------- */
+const mark = v => v === 'pass' ? '<span class="ok" aria-label="Pass">✓</span>' : v === 'fail' ? '<span class="no" aria-label="Fail">✗</span>' : '';
+const cleanMark = b => b ? '<span class="ok" aria-label="Yes">✓</span>' : '';
+const cleanedIn = t => !!(t.preIn || t.postIn);
+const cleanedOut = t => !!(t.preOut || t.postOut);
+const miles = t => (t.end != null && t.begin != null) ? t.end - t.begin : null;
+
+function renderSheets(){
+  const months = allMonths();
+  const sel = $('#monthSel');
+  const cur = sel.value && months.includes(sel.value) ? sel.value : (months[0] || monthOf(todayISO()));
+  sel.innerHTML = months.map(m => '<option value="'+m+'"'+(m===cur?' selected':'')+'>'+monthName(m)+' ('+getSheet(m).length+')</option>').join('');
+  const trips = getSheet(cur);
+  let html = '<thead><tr><th>Date</th><th>Beginning mileage</th><th>Ending mileage</th><th>Type of route</th><th>Fuel</th><th>Name of driver</th><th class="c">Pre-trip check</th><th class="c">Post-trip check</th><th class="c">Cleaned inside</th><th class="c">Cleaned outside</th><th>Miles</th></tr></thead><tbody>';
+  if (!trips.length) html += '<tr><td colspan="11" style="white-space:normal;color:var(--muted);cursor:default">No trips logged for ' + monthName(cur) + ' yet. Use Log a trip to add one.</td></tr>';
+  trips.forEach(t => {
+    html += '<tr data-id="'+t.id+'" data-m="'+cur+'" tabindex="0"><td>'+shortDate(t.date)+'</td><td>'+(t.begin??'')+'</td><td>'+(t.end!=null?t.end:'<span class="open">Open</span>')+'</td><td>'+esc(t.route)+'</td><td>'+esc(t.fuel??'')+'</td><td>'+esc(t.driver)+'</td><td class="c">'+mark(t.preCheck)+'</td><td class="c">'+mark(t.postCheck)+'</td><td class="c">'+cleanMark(cleanedIn(t))+'</td><td class="c">'+cleanMark(cleanedOut(t))+'</td><td>'+(miles(t)??'')+'</td></tr>';
+  });
+  $('#sheetTable').innerHTML = html + '</tbody>';
+  const tm = trips.reduce((s,t) => s + (miles(t)||0), 0);
+  const open = trips.filter(t => t.end == null).length;
+  $('#totals').innerHTML = '<span>Trips <b>'+trips.length+'</b></span><span>Miles <b>'+tm+'</b></span>' + (open ? '<span>Still open <b>'+open+'</b></span>' : '');
+}
+$('#monthSel').addEventListener('change', renderSheets);
+$('#sheetTable').addEventListener('click', e => { const r = e.target.closest('tr[data-id]'); if (r) openEdit(r.dataset.m, r.dataset.id); });
+$('#sheetTable').addEventListener('keydown', e => { if (e.key==='Enter'){ const r = e.target.closest('tr[data-id]'); if (r) openEdit(r.dataset.m, r.dataset.id); } });
+
+/* ---------- edit dialog ---------- */
+let editing = null;
+function openEdit(m, id){
+  const t = getSheet(m).find(x => x.id === id); if (!t) return;
+  editing = {m, id}; clearErrs(); say('editMsg','');
+  $('#eDate').value = t.date; $('#eBus').value = t.bus || '';
+  $('#eBegin').value = t.begin ?? ''; $('#eEnd').value = t.end ?? '';
+  $('#eRoute').value = t.route || ''; $('#eFuel').value = t.fuel ?? ''; $('#eDriver').value = t.driver || '';
+  pfSet('ePre', t.preCheck || ''); pfSet('ePost', t.postCheck || '');
+  $('#eIn').checked = cleanedIn(t); $('#eOut').checked = cleanedOut(t);
+  $('#editDlg').showModal();
+}
+$('#eCancel').onclick = () => $('#editDlg').close();
+$('#eDelete').onclick = async () => {
+  if (!editing) return;
+  $('#editDlg').close();
+  if (!(await ask('This trip will be removed from the sheet. This can’t be undone.', 'Delete trip', 'Delete this trip?'))){ $('#editDlg').showModal(); return; }
+  putSheet(editing.m, getSheet(editing.m).filter(x => x.id !== editing.id));
+  $('#editDlg').close(); renderSheets(); renderEmptyBanner(); toast('Trip deleted');
+};
+$('#eSave').onclick = () => {
+  if (!editing) return;
+  const date = $('#eDate').value, eb = num($('#eBegin').value), ee = num($('#eEnd').value);
+  const errs = [];
+  if (!date) errs.push(['#eDate', 'Pick the date.']);
+  if (!$('#eBus').value.trim()) errs.push(['#eBus', 'Enter the bus number.']);
+  if (eb == null) errs.push(['#eBegin', 'Enter the beginning mileage.']); else if (!wholeMiles(eb)) errs.push(['#eBegin', 'Use a whole number.']);
+  if (ee != null && !wholeMiles(ee)) errs.push(['#eEnd', 'Use a whole number.']);
+  if (ee == null && pfGet('ePost')) errs.push(['#eEnd', 'Enter the ending mileage, or clear the post-trip check.']);
+  if (!$('#eRoute').value.trim()) errs.push(['#eRoute', 'Enter the type of route.']);
+  if (!$('#eDriver').value.trim()) errs.push(['#eDriver', 'Enter the driver’s name.']);
+  if (!pfGet('ePre')) errs.push(['.pf[data-name="ePre"]', 'Choose Pass or Fail.']);
+  if (ee != null && !pfGet('ePost')) errs.push(['.pf[data-name="ePost"]', 'Choose Pass or Fail.']);
+  if (flag(errs)){ say('editMsg', errs.length === 1 ? '1 field needs attention.' : errs.length + ' fields need attention.'); return; }
+  say('editMsg', '');
+  const old = getSheet(editing.m);
+  const t = old.find(x => x.id === editing.id); if (!t) return;
+  const ein = $('#eIn').checked, eout = $('#eOut').checked;
+  Object.assign(t, {
+    date, bus: $('#eBus').value.trim(), begin: num($('#eBegin').value), end: num($('#eEnd').value),
+    route: $('#eRoute').value.trim(), fuel: $('#eFuel').value.trim(), driver: $('#eDriver').value.trim(),
+    preCheck: pfGet('ePre'), postCheck: pfGet('ePost'),
+  });
+  if (!ein){ t.preIn = t.postIn = false; } else if (!t.preIn && !t.postIn){ t.preIn = true; }
+  if (!eout){ t.preOut = t.postOut = false; } else if (!t.preOut && !t.postOut){ t.preOut = true; }
+  const nm = monthOf(date);
+  if (nm === editing.m) putSheet(nm, old);
+  else { putSheet(editing.m, old.filter(x => x.id !== t.id)); const ns = getSheet(nm); ns.push(t); putSheet(nm, ns); $('#monthSel').value = nm; }
+  $('#editDlg').close(); refreshLists(); renderSheets(); toast('Changes saved');
+};
+
+/* ---------- bus number ---------- */
+$('#busBtn').onclick = () => { clearErrs(); $('#busInput').value = settings.bus || ''; $('#busDlg').showModal(); $('#busInput').focus(); };
+$('#busCancel').onclick = () => $('#busDlg').close();
+$('#busSave').onclick = () => {
+  const v = $('#busInput').value.trim();
+  if (flag(v ? [] : [['#busInput', 'Enter the bus number.']])) return;
+  settings.bus = v; saveSettings(); renderBus(); $('#bus').value = v; clearErr($('#bus'));
+  $('#busDlg').close(); prepPre(); toast('Bus number saved');
+};
+$('#busInput').addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); $('#busSave').click(); } });
+
+/* ---------- exports ---------- */
+function busesIn(trips){ const b = [...new Set(trips.map(t => t.bus).filter(Boolean))]; return b.length ? b.join(', ') : (settings.bus || ''); }
+function yearsIn(months){ const y = [...new Set(months.map(m => m.slice(0,4)))].sort(); return y.length > 1 ? y[0] + '-' + y[y.length-1] : (y[0] || todayISO().slice(0,4)); }
+function safe(s){ return String(s).replace(/[^A-Za-z0-9-]+/g,'-').replace(/-+/g,'-').replace(/^-|-$/g,''); }
+
+function csvCell(v){ v = v == null ? '' : String(v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g,'""') + '"' : v; }
+function buildCSV(months){
+  const trips = months.flatMap(m => getSheet(m));
+  const bus = busesIn(trips), year = yearsIn(months);
+  const title = months.length === 1 ? 'Monthly Mileage Sheet - ' + monthName(months[0]) : 'Mileage Log - All Months';
+  const rows = [
+    [title], ['Bus #', bus], ['Year', year], [],
+    ['Month','Date','Bus #','Beginning Mileage','Ending Mileage','Type of Route','Fuel','Name of Driver','Pre-Trip Check','Post-Trip Check','Cleaned Inside of Bus','Cleaned Outside of Bus','Miles Driven']
+  ];
+  months.slice().sort().forEach(m => getSheet(m).forEach(t => rows.push([
+    monthName(m), usDate(t.date), t.bus || '', t.begin ?? '', t.end ?? '', t.route, t.fuel ?? '', t.driver,
+    t.preCheck === 'pass' ? 'Pass' : t.preCheck === 'fail' ? 'Fail' : '',
+    t.postCheck === 'pass' ? 'Pass' : t.postCheck === 'fail' ? 'Fail' : (t.end == null ? 'Not completed' : ''),
+    cleanedIn(t) ? 'Yes' : 'No', cleanedOut(t) ? 'Yes' : 'No', miles(t) ?? ''
+  ])));
+  const tm = trips.reduce((s,t) => s + (miles(t)||0), 0);
+  rows.push([], ['Total miles', tm]);
+  return { text: '\uFEFF' + rows.map(r => r.map(csvCell).join(',')).join('\r\n'), bus, year };
+}
+
+function deliver(name, text, type){
+  const blob = new Blob([text], {type});
+  const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform));
+  try{
+    const file = new File([blob], name, {type});
+    if (mobile && navigator.canShare && navigator.canShare({files:[file]})){
+      navigator.share({files:[file], title:name}).catch(()=>{});
+      return;
+    }
+  }catch(e){}
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+
+function exportCSV(months){
+  if (!months.length || !months.some(m => getSheet(m).length)){ toast('There are no trips to export yet.'); return; }
+  const {text, bus, year} = buildCSV(months);
+  const label = months.length === 1 ? MONTHS[+months[0].slice(5,7)-1] : 'All-Months';
+  deliver(safe('Bus-' + (bus || 'Mileage') + '-Mileage-' + label + '-' + year) + '.csv', text, 'text/csv');
+}
+
+function exportPDF(months){
+  if (!months.length || !months.some(m => getSheet(m).length)){ toast('There are no trips to export yet.'); return; }
+  const sorted = months.slice().sort();
+  const pmark = v => v === 'pass' ? '✓' : v === 'fail' ? '✗' : '';
+  $('#printArea').innerHTML = sorted.filter(m => getSheet(m).length).map(m => {
+    const trips = getSheet(m);
+    const tm = trips.reduce((s,t) => s + (miles(t)||0), 0);
+    return '<section class="psheet"><div class="ptitle"><div>Year: ' + m.slice(0,4) + '</div><h1>MONTHLY MILEAGE SHEET FOR BUS #: ' + esc(busesIn(trips)) + '</h1><div style="text-align:right">' + MONTHS[+m.slice(5,7)-1] + ' ' + m.slice(0,4) + '</div></div>' +
+      '<table class="ptable"><thead><tr><th>Date</th><th>Beginning Mileage</th><th>Ending Mileage</th><th>Type of Route</th><th>Fuel</th><th>Name of Driver</th><th>Pre-Trip Check</th><th>Post-Trip Check</th><th>Cleaned Inside of Bus</th><th>Cleaned Outside of Bus</th></tr></thead><tbody>' +
+      trips.map(t => '<tr><td>' + shortDate(t.date) + '</td><td>' + (t.begin ?? '') + '</td><td>' + (t.end ?? '') + '</td><td>' + esc(t.route) + '</td><td>' + esc(t.fuel ?? '') + '</td><td>' + esc(t.driver) + '</td><td class="c">' + pmark(t.preCheck) + '</td><td class="c">' + pmark(t.postCheck) + '</td><td class="c">' + (cleanedIn(t) ? '✓' : '') + '</td><td class="c">' + (cleanedOut(t) ? '✓' : '') + '</td></tr>').join('') +
+      '</tbody></table><div class="pfoot">Total miles: <b>' + tm + '</b>' + (trips.some(t => t.end == null) ? ' &nbsp;&nbsp; Open trips (no post-trip yet): <b>' + trips.filter(t => t.end == null).length + '</b>' : '') + '</div></section>';
+  }).join('');
+  const allT = sorted.flatMap(m => getSheet(m));
+  const label = sorted.length === 1 ? MONTHS[+sorted[0].slice(5,7)-1] : 'All-Months';
+  const oldTitle = document.title;
+  document.title = safe('Bus-' + (busesIn(allT) || 'Mileage') + '-Mileage-' + label + '-' + yearsIn(sorted));
+  const restore = () => { document.title = oldTitle; window.removeEventListener('afterprint', restore); };
+  window.addEventListener('afterprint', restore);
+  setTimeout(() => { window.print(); setTimeout(restore, 3000); }, 50);
+}
+
+$('#csvMonth').onclick = () => exportCSV([$('#monthSel').value]);
+$('#pdfMonth').onclick = () => exportPDF([$('#monthSel').value]);
+$('#csvAll').onclick = () => exportCSV(allMonths());
+$('#pdfAll').onclick = () => exportPDF(allMonths());
+
+/* ---------- backup / restore ---------- */
+function backupJSON(){
+  const data = { app:'bus-mileage-log', version:1, savedAt:new Date().toISOString(), settings:{bus:settings.bus, driver:settings.driver}, sheets:{} };
+  allMonths().forEach(m => data.sheets[m] = getSheet(m));
+  return JSON.stringify(data, null, 1);
+}
+function backupName(){ return safe('Bus-' + (settings.bus || 'Mileage') + '-Backup-' + todayISO()) + '.json'; }
+
+/* Saved file location (Chromebook / Windows / Mac in Chrome or Edge): kept in IndexedDB */
+const canPick = 'showSaveFilePicker' in window && window.self === window.top;
+function idb(){ return new Promise((res, rej) => { try{ const r = indexedDB.open('bml-files', 1); r.onupgradeneeded = () => r.result.createObjectStore('h'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }catch(e){ rej(e); } }); }
+async function getHandle(){ try{ const db = await idb(); return await new Promise(res => { const q = db.transaction('h').objectStore('h').get('backup'); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); }catch(e){ return null; } }
+async function setHandle(h){ try{ const db = await idb(); await new Promise(res => { const tx = db.transaction('h','readwrite'); tx.objectStore('h').put(h,'backup'); tx.oncomplete = res; tx.onerror = res; }); }catch(e){} }
+
+function downloadQuiet(name, text){
+  const blob = new Blob([text], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+}
+function markBackup(how){ settings.lastBackup = new Date().toISOString(); settings.lastBackupHow = how; saveSettings(); renderBackupStatus(); }
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (/Mac/.test(navigator.platform) && navigator.maxTouchPoints > 1);
+const fileBackupOn = () => settings.fileBackup !== false;
+
+/* Save a backup file. Returns 'saved', 'cancelled' or 'failed' (never claims success it can't confirm). */
+async function saveBackupFile(){
+  const text = backupJSON();
+  if (canPick){
+    const h = await getHandle();
+    if (h){
+      try{
+        let perm = await h.queryPermission({mode:'readwrite'});
+        if (perm !== 'granted') perm = await h.requestPermission({mode:'readwrite'});
+        if (perm === 'granted'){ const w = await h.createWritable(); await w.write(text); await w.close(); markBackup('file:' + h.name); return 'saved'; }
+      }catch(e){}
+    }
+  }
+  if (isIOS){
+    try{
+      const file = new File([text], backupName(), {type:'application/json'});
+      if (navigator.canShare && navigator.canShare({files:[file]})){
+        await navigator.share({files:[file]});
+        markBackup('shared'); return 'saved';
+      }
+    }catch(e){ return e && e.name === 'AbortError' ? 'cancelled' : 'failed'; }
+  }
+  try{ downloadQuiet(backupName(), text); markBackup('download'); return 'saved'; }
+  catch(e){ return 'failed'; }
+}
+function showRetry(result){
+  $('#retryText').textContent = result === 'cancelled'
+    ? 'The trip is saved, but the backup file wasn’t, because the save window was closed. Tap below and choose Save to Files.'
+    : 'The trip is saved, but the backup file couldn’t be saved. Tap below to try again.';
+  $('#retryBox').hidden = false;
+}
+async function autoBackup(){
+  $('#retryBox').hidden = true;
+  const r = await saveBackupFile();
+  if (r === 'saved') toast('Post-trip saved. Backup file saved.');
+  else showRetry(r);
+}
+$('#retryBackup').onclick = async () => {
+  const r = await saveBackupFile();
+  if (r === 'saved'){ $('#retryBox').hidden = true; toast('Backup file saved'); } else showRetry(r);
+};
+$('#backupBtn').onclick = async () => {
+  const r = await saveBackupFile();
+  toast(r === 'saved' ? 'Backup file saved' : r === 'cancelled' ? 'Backup file not saved. The window was closed.' : 'Backup file couldn’t be saved');
+};
+
+const fmtTime = iso => new Date(iso).toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+
+function renderBackupStatus(){
+  $('#autoBackup').checked = fileBackupOn();
+  $('#pickWrap').hidden = !canPick;
+  let t = settings.lastBackup ? 'Last backup file: ' + fmtTime(settings.lastBackup) + '.' : 'No backup file saved yet.';
+  if (settings.lastBackupHow && settings.lastBackupHow.startsWith('file:')) t += ' Updating ' + settings.lastBackupHow.slice(5) + '.';
+  else if (settings.lastBackupHow === 'download') t += ' Saved to the Downloads folder.';
+  else if (settings.lastBackupHow === 'shared') t += ' Saved where you chose in the share window.';
+  $('#backupStatus').textContent = t;
+}
+function renderIpadTip(){ $('#ipadTip').hidden = !(isIOS && fileBackupOn()); }
+$('#autoBackup').onchange = e => { settings.fileBackup = e.target.checked; saveSettings(); renderIpadTip(); toast(settings.fileBackup ? 'Backup file after each post-trip: on' : 'Backup file after each post-trip: off'); };
+$('#pickBackup').onclick = async () => {
+  try{
+    const h = await window.showSaveFilePicker({ suggestedName: safe('Bus-' + (settings.bus || 'Mileage') + '-Backup') + '.json', types:[{description:'Bus Mileage backup', accept:{'application/json':['.json']}}] });
+    await setHandle(h);
+    const w = await h.createWritable(); await w.write(backupJSON()); await w.close();
+    markBackup('file:' + h.name); toast('Backup location saved');
+  }catch(e){ if (e && e.name !== 'AbortError') toast('That location couldn’t be used. Try another folder.'); }
+};
+$('#emptyRestore').onclick = () => $('#restoreFile').click();
+function renderEmptyBanner(){ $('#emptyBanner').hidden = allTrips().length > 0; }
+
+/* Adds trips from a backup that aren’t already here. Returns how many were added. */
+function mergeBackup(data){
+  if (!data || data.app !== 'bus-mileage-log' || typeof data.sheets !== 'object') throw new Error('not a backup');
+  let added = 0;
+  Object.keys(data.sheets).forEach(m => {
+    if (!/^\d{4}-\d{2}$/.test(m)) return;
+    const cur = getSheet(m), ids = new Set(cur.map(t => t.id));
+    (data.sheets[m] || []).forEach(t => { if (t && t.id && !ids.has(t.id)){ cur.push(t); added++; } });
+    putSheet(m, cur);
+  });
+  if (data.settings){ if (!settings.bus && data.settings.bus) settings.bus = data.settings.bus; if (!settings.driver && data.settings.driver) settings.driver = data.settings.driver; saveSettings(); renderBus(); }
+  refreshLists(); renderEmptyBanner(); prepPre(); if (mode === 'post') renderOpenTrips(); if (!$('#viewSheets').hidden) renderSheets();
+  return added;
+}
+$('#restoreBtn').onclick = () => $('#restoreFile').click();
+$('#restoreFile').onchange = e => {
+  const f = e.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{ const added = mergeBackup(JSON.parse(r.result)); toast(added + ' trip' + (added===1?'':'s') + ' restored'); }
+    catch(err){ toast('That file isn’t a Bus Mileage backup.'); }
+    e.target.value = '';
+  };
+  r.readAsText(f);
+};
+
+/* ---------- connection status ---------- */
+function net(){
+  const on = navigator.onLine;
+  $('#netDot').classList.toggle('on', on);
+  $('#netText').textContent = on ? 'Online. Trips are saved on this device.' : 'Offline. Trips are saved on this device.';
+}
+window.addEventListener('online', net); window.addEventListener('offline', net);
+
+/* ---------- start ---------- */
+document.addEventListener('visibilitychange', () => { if (!document.hidden){ ensureCurrentMonth(); if (!$('#viewSheets').hidden) renderSheets(); } });
+ensureCurrentMonth();
+$('#date').value = todayISO();
+renderBus(); refreshLists(); net(); setMode('pre'); renderBackupStatus(); renderEmptyBanner(); renderIpadTip();
+try{ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(()=>{}); }catch(e){}
+})();
+</script>
+</body>
+</html>

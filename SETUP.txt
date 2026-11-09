@@ -1,0 +1,37 @@
+BUS MILEAGE LOG - SETUP
+=======================
+
+PUT THE APP ON THE IPADS (one time)
+1. Upload index.html, sw.js, manifest.json, icon-192.png and icon-512.png
+   to any https address (Netlify, GitHub Pages, a district web server).
+2. On each iPad, open that address in Safari while online, then
+   Share > Add to Home Screen (or push a full-screen Web Clip with Mosyle).
+3. Open it once from the icon. After that it works with no internet.
+   Everything is saved on that iPad only.
+
+
+TRAINING POINTS FOR DRIVERS
+- Always open the app from its home-screen icon, not a Safari tab.
+- Bus # is remembered. Change it on the pre-trip form when driving a
+  different bus.
+- After saving a post-trip, a window opens for the backup file:
+  tap Save to Files, then Save. Do NOT close it with the X.
+  If they do close it, the app says the backup wasn't saved and shows a
+  "Save backup file" button to try again.
+- Backup files go to the Files app (On My iPad or Downloads, wherever they
+  picked). The newest file always contains every month.
+- If the app ever opens empty: tap "Restore from backup" and pick the
+  newest backup file. Restoring never erases anything already there.
+- Export the CSV or PDF at the end of each month (Monthly sheets tab).
+
+WHAT ERASES THE APP'S DATA
+- Deleting the home-screen icon (or removing the Mosyle Web Clip profile)
+- Settings > Safari > Clear History and Website Data
+- Wiping or resetting the iPad (this also erases the backup files, so
+  export monthly)
+Backup files in the Files app survive the first two.
+
+
+UPDATING THE APP
+After changing index.html, change the version in sw.js
+(bus-mileage-v10 -> bus-mileage-v11) and re-upload both files.
